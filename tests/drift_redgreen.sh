@@ -7,29 +7,47 @@
 #      Negative control: an object carrying Flux's labels that Flux never applied is NOT
 #      pruned, because prune works from the Kustomization inventory, not from labels.
 # Reports the time to repair for each. Interval on dev is 1m, so expect <= ~70 s.
+#
+# FINDING (2026-10-08): a deletion that lands while Flux is inside a `wait: true` health
+# check is NOT repaired until that check times out (3m here) and the next run applies.
+# Flux waits on the inventory it just applied; it does not re-apply mid-wait. Measured:
+# Service deleted mid-wait, "health check failed after 3m0s: Service status NotFound",
+# recreated by the following reconcile. So worst-case repair = timeout + interval.
+# The test therefore waits for the Kustomization to be idle before each case, and the
+# numbers it reports are the idle-cluster repair times.
 set -uo pipefail
 export PATH=$HOME/bin:$PATH
 NS=hello-signed
 rc=0
 t() { date +%s; }
+idle() {  # block until the apps Kustomization is Ready and not mid-reconcile
+  for i in $(seq 1 240); do
+    r=$(kubectl -n flux-system get kustomization apps -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+    rec=$(kubectl -n flux-system get kustomization apps -o jsonpath='{.status.conditions[?(@.type=="Reconciling")].status}' 2>/dev/null)
+    [ "$r" = True ] && [ "$rec" != True ] && return 0; sleep 1
+  done; echo "  (apps never went idle)"; return 1
+}
 wait_for() {  # desc, timeout_s, cmd that must print "ok"
   local d=$1 to=$2; shift 2; local s=$(t)
   for i in $(seq 1 $to); do [ "$("$@" 2>/dev/null)" = ok ] && { echo "PASS  $d repaired in $(( $(t) - s ))s"; return 0; }; sleep 1; done
   echo "FAIL  $d not repaired within ${to}s"; rc=1; return 1
 }
 
+idle
 echo "== 1. scale drift"
 kubectl -n $NS scale deploy hello-signed --replicas=3 >/dev/null
 echo "  replicas now: $(kubectl -n $NS get deploy hello-signed -o jsonpath='{.spec.replicas}') (git says 1)"
 flux reconcile kustomization apps --with-source >/dev/null 2>&1 &
 wait_for "scale 3 -> 1" 120 bash -c "[ \"\$(kubectl -n $NS get deploy hello-signed -o jsonpath='{.spec.replicas}')\" = 1 ] && echo ok"
 
+idle
 echo "== 2. delete drift"
 kubectl -n $NS delete svc hello-signed --wait=true >/dev/null
 echo "  service deleted: $(kubectl -n $NS get svc hello-signed 2>&1 | grep -c NotFound) (1 = gone)"
 flux reconcile kustomization apps --with-source >/dev/null 2>&1 &
 wait_for "deleted Service recreated" 120 bash -c "kubectl -n $NS get svc hello-signed -o name 2>/dev/null | grep -q . && echo ok"
 
+idle
 echo "== 3. prune: add an object via git, then remove it via git; Flux must delete it from the cluster"
 echo "   (Flux prunes from its inventory, NOT from labels: an object that merely carries Flux's"
 echo "    labels but was never applied by Flux is left alone. Tested below as the negative control.)"
