@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prune-probe
+  namespace: hello-signed
+data:
+  k: v
