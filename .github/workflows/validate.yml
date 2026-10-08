@@ -1,0 +1,22 @@
+name: validate
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install kubectl and kubeconform
+        run: |
+          set -e
+          curl -sLo /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.36.4/bin/linux/amd64/kubectl"
+          chmod +x /usr/local/bin/kubectl
+          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin kubeconform
+      - name: validate overlays and policy
+        run: bash scripts/validate.sh
+      - name: red-run the validator
+        run: bash tests/redrun_validate.sh

@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base/hello-signed
+images:
+  - name: ghcr.io/betv3/hello-signed
+    newTag: v1.0.0 # replaced with digest after the signing pipeline publishes
