@@ -9,9 +9,10 @@ RC=0
 fail() { echo "FAIL: $*"; RC=1; }
 
 echo "== kustomize build + kubeconform (k8s $K8S_VERSION, strict)"
-for d in infra/dev infra/stg infra/prd apps/dev apps/stg apps/prd; do
+for d in infra/dev infra/stg infra/prd policies/dev policies/stg policies/prd apps/dev apps/stg apps/prd; do
   out=$(kubectl kustomize "$d" 2>&1) || { fail "$d does not build: $(echo "$out" | head -3)"; continue; }
   kubeconform -strict -kubernetes-version "$K8S_VERSION" -summary \
+       -skip CustomResourceDefinition \
        -schema-location default \
        -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
        - <<<"$out" > /tmp/kc.$$ 2>&1

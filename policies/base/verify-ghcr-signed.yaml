@@ -1,0 +1,39 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-ghcr-betv3-signed
+  annotations:
+    policies.kyverno.io/title: Require keyless cosign signature on ghcr.io/betv3 images
+    policies.kyverno.io/description: >-
+      Any Pod in the covered namespaces that runs an image from ghcr.io/betv3/* must carry a
+      cosign signature issued by GitHub Actions OIDC for a workflow in the BetV3 org, recorded
+      in the public Rekor log. Images are also rewritten to their digest so what was verified
+      is what runs. Unsigned or foreign-signed images are rejected at admission.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  rules:
+    - name: keyless-github-oidc
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [hello-signed, policy-test]
+      verifyImages:
+        - imageReferences: ["ghcr.io/betv3/*"]
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          failureAction: Enforce
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    subjectRegExp: ^https://github\.com/BetV3/[^/]+/\.github/workflows/.+@refs/(tags/v.+|heads/main)$
+                    issuer: https://token.actions.githubusercontent.com
+                    rekor:
+                      url: https://rekor.sigstore.dev
+                    ctlog:
+                      ignoreSCT: false

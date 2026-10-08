@@ -7,6 +7,7 @@ spec:
   interval: 5m
   dependsOn:
     - name: infra
+    - name: policies
   sourceRef:
     kind: GitRepository
     name: flux-system
