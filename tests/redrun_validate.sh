@@ -18,7 +18,7 @@ run_case "control: untouched tree"            "true"                            
 run_case "unknown field rejected"             "sed -i 's/replicas: 1/replicas: 1\n  replicaz: 2/' apps/base/hello-signed/deployment.yaml" FAIL
 run_case "broken yaml"                        "echo '  - : [' >> apps/base/hello-signed/service.yaml"                                   FAIL
 run_case ":latest rejected"                   "sed -i 's/newTag: .*/newTag: latest/' apps/dev/kustomization.yaml"                       FAIL
-run_case "prd not digest-pinned rejected"     "printf 'resources:\n  - ../base/hello-signed\nimages:\n  - name: ghcr.io/betv3/hello-signed\n    newTag: v1.0.0\n' > apps/prd/kustomization.yaml; sed -i '1i apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization' apps/prd/kustomization.yaml" FAIL
+run_case "prd not digest-pinned rejected"     "sed -i '/digest:/d' apps/prd/kustomization.yaml; sed -i 's/name: ghcr.io\\/betv3\\/hello-signed/name: ghcr.io\\/betv3\\/hello-signed\\n    newTag: v1.0.0/' apps/prd/kustomization.yaml" FAIL
 run_case "prune: false rejected"              "sed -i 's/prune: true/prune: false/' clusters/dev/apps.yaml"                             FAIL
 run_case "wait removed rejected"              "sed -i '/wait: true/d' clusters/prd/infra.yaml"                                          FAIL
 run_case "em dash in README rejected"         "printf 'a \xe2\x80\x94 b\n' >> README.md"                                                FAIL

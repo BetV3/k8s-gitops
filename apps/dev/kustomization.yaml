@@ -4,4 +4,5 @@ resources:
   - ../base/hello-signed
 images:
   - name: ghcr.io/betv3/hello-signed
-    newTag: v1.0.0 # replaced with digest after the signing pipeline publishes
+    newTag: v1.0.0
+    digest: sha256:29115da7706d9c09243bb25a221d9ddeaaeb50b8285b25e0ee4972197fbc1ae5
